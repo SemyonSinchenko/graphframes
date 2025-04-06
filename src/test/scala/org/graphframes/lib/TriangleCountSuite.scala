@@ -20,25 +20,31 @@ package org.graphframes.lib
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.types.DataTypes
 
+import org.graphframes.GraphFrame.quote
 import org.graphframes.{GraphFrameTestSparkContext, GraphFrame, SparkFunSuite, TestUtils}
 
 class TriangleCountSuite extends SparkFunSuite with GraphFrameTestSparkContext {
 
   test("Count a single triangle") {
     val edges = spark.createDataFrame(Array(0L -> 1L, 1L -> 2L, 2L -> 0L)).toDF("src", "dst")
-    val vertices = spark.createDataFrame(Seq((0L, "a"), (1L, "b"), (2L, "c")))
+    val vertices = spark
+      .createDataFrame(Seq((0L, "a"), (1L, "b"), (2L, "c")))
       .toDF("id", "a")
     val g = GraphFrame(vertices, edges)
     val v2 = g.triangleCount.run()
     TestUtils.testSchemaInvariants(g, v2)
     TestUtils.checkColumnType(v2.schema, "count", DataTypes.LongType)
     v2.select("id", "count", "a")
-      .collect().foreach { case Row(vid: Long, count: Long, _) => assert(count === 1) }
+      .collect()
+      .foreach { case Row(vid: Long, count: Long, _) => assert(count === 1) }
   }
 
   test("Count two triangles") {
-    val edges = spark.createDataFrame(Array(0L -> 1L, 1L -> 2L, 2L -> 0L) ++
-      Array(0L -> -1L, -1L -> -2L, -2L -> 0L)).toDF("src", "dst")
+    val edges = spark
+      .createDataFrame(
+        Array(0L -> 1L, 1L -> 2L, 2L -> 0L) ++
+          Array(0L -> -1L, -1L -> -2L, -2L -> 0L))
+      .toDF("src", "dst")
     val g = GraphFrame.fromEdges(edges)
     val v2 = g.triangleCount.run()
     v2.select("id", "count").collect().foreach { case Row(id: Long, count: Long) =>
@@ -67,13 +73,44 @@ class TriangleCountSuite extends SparkFunSuite with GraphFrameTestSparkContext {
   }
 
   test("Count a single triangle with duplicate edges") {
-    val edges = spark.createDataFrame(Array(0L -> 1L, 1L -> 2L, 2L -> 0L) ++
-        Array(0L -> 1L, 1L -> 2L, 2L -> 0L)).toDF("src", "dst")
+    val edges = spark
+      .createDataFrame(
+        Array(0L -> 1L, 1L -> 2L, 2L -> 0L) ++
+          Array(0L -> 1L, 1L -> 2L, 2L -> 0L))
+      .toDF("src", "dst")
     val g = GraphFrame.fromEdges(edges)
     val v2 = g.triangleCount.run()
     v2.select("id", "count").collect().foreach { case Row(id: Long, count: Long) =>
       assert(count === 1)
     }
+  }
+
+  test("Count with dot column name") {
+    val edges = sqlContext.createDataFrame(Array(0L -> 1L, 1L -> 2L, 2L -> 0L)).toDF("src", "dst")
+    val vertices = sqlContext
+      .createDataFrame(Seq((0L, "a"), (1L, "b"), (2L, "c")))
+      .toDF("id", "a.column")
+    val g = GraphFrame(vertices, edges)
+    val v2 = g.triangleCount.run()
+    TestUtils.testSchemaInvariants(g, v2)
+    TestUtils.checkColumnType(v2.schema, "count", DataTypes.LongType)
+    v2.select("id", "count", quote("a.column"))
+      .collect()
+      .foreach { case Row(vid: Long, count: Long, _) => assert(count === 1) }
+  }
+
+  test("Count with backquote in column name") {
+    val edges = sqlContext.createDataFrame(Array(0L -> 1L, 1L -> 2L, 2L -> 0L)).toDF("src", "dst")
+    val vertices = sqlContext
+      .createDataFrame(Seq((0L, "a"), (1L, "b"), (2L, "c")))
+      .toDF("id", "a `column`")
+    val g = GraphFrame(vertices, edges)
+    val v2 = g.triangleCount.run()
+    TestUtils.testSchemaInvariants(g, v2)
+    TestUtils.checkColumnType(v2.schema, "count", DataTypes.LongType)
+    v2.select("id", "count", quote("a `column`"))
+      .collect()
+      .foreach { case Row(vid: Long, count: Long, _) => assert(count === 1) }
   }
 
   test("no triangle") {

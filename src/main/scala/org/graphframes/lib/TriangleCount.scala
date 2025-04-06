@@ -21,20 +21,20 @@ import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions.{array, col, explode, when}
 
 import org.graphframes.GraphFrame
-import org.graphframes.GraphFrame.{DST, ID, LONG_DST, LONG_SRC, SRC}
+import org.graphframes.GraphFrame.{DST, ID, LONG_DST, LONG_SRC, SRC, quote}
 
 /**
  * Computes the number of triangles passing through each vertex.
  *
- * This algorithm ignores edge direction; i.e., all edges are treated as undirected.
- * In a multigraph, duplicate edges will be counted only once.
+ * This algorithm ignores edge direction; i.e., all edges are treated as undirected. In a
+ * multigraph, duplicate edges will be counted only once.
  *
- * Note that this provides the same algorithm as GraphX, but GraphX assumes the user provides
- * a graph in the correct format.  In Spark 2.0+, GraphX can automatically canonicalize
- * the graph to put it in this format.
+ * Note that this provides the same algorithm as GraphX, but GraphX assumes the user provides a
+ * graph in the correct format. In Spark 2.0+, GraphX can automatically canonicalize the graph to
+ * put it in this format.
  *
  * The returned DataFrame contains all the original vertex information and one additional column:
- *  - count (`LongType`): the count of triangles
+ *   - count (`LongType`): the count of triangles
  */
 class TriangleCount private[graphframes] (private val graph: GraphFrame) extends Arguments {
 
@@ -67,8 +67,9 @@ private object TriangleCount {
 
     val v = graph.vertices
     val countsCol = when(col("count").isNull, 0L).otherwise(col("count"))
-    val newV = v.join(triangleCounts, v(ID) === triangleCounts(ID), "left_outer")
-      .select((countsCol.as(COUNT_ID) +: v.columns.map(v.apply)).toSeq: _*)
+    val newV = v
+      .join(triangleCounts, v(ID) === triangleCounts(ID), "left_outer")
+      .select((countsCol.as(COUNT_ID) +: v.columns.map(quote).map(v.apply)).toSeq: _*)
     newV
   }
 
