@@ -156,3 +156,11 @@ lazy val connect = (project in file("graphframes-connect"))
     Compile / packageBin / publishArtifact := true,
     Compile / packageDoc / publishArtifact := false,
     Compile / packageSrc / publishArtifact := false)
+
+lazy val propertyGF = (project in file("graphframes-property-graph"))
+.dependsOn(root)
+.settings(
+  commonSetting,
+  name := "graphframes-property-graph",
+  moduleName := s"${name.value}-spark${sparkBranch}",
+)
